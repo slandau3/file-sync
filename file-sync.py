@@ -10,7 +10,7 @@ import re
 import calendar
 
 VERBOSE = False
-
+LOCAL_ONLY = False
 
 def daemonize():
     UMASK = 0
@@ -80,6 +80,7 @@ def write_d_info(ret_code):
     dfile.write(procParams + "\n")
     dfile.flush()
     dfile.close()
+
 
 def sync(local_file, remote_file):
     # Separate file directory from address of remote file
@@ -156,12 +157,15 @@ if __name__ == '__main__':
                                                                        'overwrite verbosity')
     parser.add_argument('local_file', help="The local file to watch and transfer")
     parser.add_argument('remote_file', help="The remote file to be updated to the local_file")
+    parser.add_argument('--local_only', action='store_true', help='Disregard the modification time of the remote file.' \
+                                                                'This will cause the local to always overwrite the remote.')
     args = parser.parse_args()
 
     VERBOSE = args.verbose  # Turns on print statements
+    LOCAL_ONLY = args.local_only
 
-    local_file = sys.argv[-2]
-    remote_file = sys.argv[-1]
+    local_file = args.local_file
+    remote_file = args.remote_file
 
     if args.daemonize:
         print('daemonizing')
@@ -169,4 +173,3 @@ if __name__ == '__main__':
         write_d_info(ret_code)
 
     sync('file-sync', 'pi@98.113.95.132:/home/pi/stevencloudsync.py')
-    print('len of args ' + str(len(sys.argv)))
