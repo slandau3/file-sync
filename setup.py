@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='file-sync',
-    version='1.0',
+    version='0.3.0',
     packages=['file-sync'],
     url='https://github.com/slandau3/file-sync',
     license='MIT',
