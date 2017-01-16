@@ -128,6 +128,10 @@ def sync(local_file, remote_file):
 
     subprocess.run(['rsync', local_file, remote_file])
 
+    if VERBOSE:
+        print("Finished uploading file")
+
+
 def extract_address(remote):
     return remote.split(':')[0]
 
@@ -155,8 +159,8 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--daemonize', action='store_true', help='Instead of running in the local terminal '
                                                                        'make the process into a daemon. This will '
                                                                        'overwrite verbosity')
-    parser.add_argument('local_file', help="The local file to watch and transfer")
-    parser.add_argument('remote_file', help="The remote file to be updated to the local_file")
+    parser.add_argument('local_file', required=True, help="The local file to watch and transfer")
+    parser.add_argument('remote_file', required=True, help="The remote file to be updated to the local_file")
     parser.add_argument('--local_only', action='store_true', help='Disregard the modification time of the remote file.' \
                                                                 'This will cause the local to always overwrite the remote.')
     args = parser.parse_args()
@@ -172,4 +176,8 @@ if __name__ == '__main__':
         ret_code = daemonize()
         write_d_info(ret_code)
 
+    #while True:
+        #sync(local_file, remote_file)
+
+    # TODO: delete bottom line when finished testing
     sync('file-sync', 'pi@98.113.95.132:/home/pi/stevencloudsync.py')
