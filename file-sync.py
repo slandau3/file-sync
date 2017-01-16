@@ -4,13 +4,23 @@
 import argparse
 import sys
 import os
-import time, datetime
+import time
 import subprocess
 import re
-import calendar
 
-VERBOSE = False
-LOCAL_ONLY = False
+parser = argparse.ArgumentParser()
+parser.add_argument('-v', '--verbose', action='store_true', help='Print whenever a transfer (save) has taken place')
+parser.add_argument('-d', '--daemonize', action='store_true', help='Instead of running in the local terminal '
+                                                                   'make the process into a daemon. This will '
+                                                                   'overwrite verbosity')
+parser.add_argument('local_file', help="The local file to watch and transfer")
+parser.add_argument('remote_file', help="The remote file to be updated to the local_file")
+parser.add_argument('--local_only', action='store_true', help='Disregard the modification time of the remote file.' \
+                                                            'This will cause the local to always overwrite the remote.')
+args = parser.parse_args()
+
+LAST_UPLOAD_TIME = 0
+
 
 def daemonize():
     UMASK = 0
@@ -97,11 +107,19 @@ def sync(local_file, remote_file):
         except FileNotFoundError:
             raise FileNotFoundError("Neither local file nor remote file exist!")
 
+    # If the file has not changed, don't upload
+    global LAST_UPLOAD_TIME
+    if LAST_UPLOAD_TIME == local_mod_time:
+        return
+    else:
+        LAST_UPLOAD_TIME = local_mod_time
+
+
     remote_dir_list = file_loc.split('/')
     actual_remote_file = remote_dir_list[-1]
     path_to_remote_file = "/".join(remote_dir_list[:-1])
 
-    remote_file_info = subprocess.run(['ssh', address, 'cd {file_loc}; ls -l | grep {remote_file}; exit'
+    remote_file_info = subprocess.run(['ssh', address, 'cd {file_loc}; stat -c %Y {remote_file}; exit'
                        .format(file_loc=path_to_remote_file, remote_file=actual_remote_file)],
                        stdout=subprocess.PIPE)
     remote_file_info = remote_file_info.stdout.decode('UTF-8')
@@ -109,26 +127,31 @@ def sync(local_file, remote_file):
     if remote_file_info == '':
         remote_mod_time = 0
     else:
-        remote_mod_time = extract_time(remote_file_info)
+        #remote_mod_time = extract_time(remote_file_info)
+        remote_mod_time = float(remote_file_info)
 
-    print(remote_file_info)
-
+    print('remote: ' + str(remote_mod_time))
+    print('local: ' + str(local_mod_time))
     time_diff = local_mod_time - remote_mod_time
 
-    if time_diff < 0 and not local_only:  # Update the local file if the remote is newer
-        subprocess.run(['rsync', remote_file, local_file])
-        return
+    print('time diff is ' + str(time_diff))
 
-    if time_diff == 0:
+
+    #if time_diff < 0 and not args.local_only:  # Update the local file if the remote is newer
+        #subprocess.run(['rsync', remote_file, local_file])
+        #print("updating local")
+        #return
+
+    if time_diff <= 0:
         return
 
     # Need to update the remote
-    if VERBOSE:
+    if args.verbose:
         print("uploading file")
 
     subprocess.run(['rsync', local_file, remote_file])
 
-    if VERBOSE:
+    if args.verbose:
         print("Finished uploading file")
 
 
@@ -140,30 +163,8 @@ def extract_file_location(remote):
     return remote.split(':')[1]
 
 
-def extract_time(remote_file_info):
-    date_stamp = re.search(r'\d+ ((\w+) (\d+) (\d+):(\d+))', remote_file_info)
-    month = date_stamp.group(2)
-    day = int(date_stamp.group(3))
-    hour = int(date_stamp.group(4))
-    min = int(date_stamp.group(5))
-    current_year = datetime.datetime.now().year
-
-    month_num = list(calendar.month_abbr).index(month)
-    print(month_num)
-
-    return datetime.datetime(current_year, month_num, day, hour, min).timestamp()
-
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-v', '--verbose', action='store_true', help='Print whenever a transfer (save) has taken place')
-    parser.add_argument('-d', '--daemonize', action='store_true', help='Instead of running in the local terminal '
-                                                                       'make the process into a daemon. This will '
-                                                                       'overwrite verbosity')
-    parser.add_argument('local_file', required=True, help="The local file to watch and transfer")
-    parser.add_argument('remote_file', required=True, help="The remote file to be updated to the local_file")
-    parser.add_argument('--local_only', action='store_true', help='Disregard the modification time of the remote file.' \
-                                                                'This will cause the local to always overwrite the remote.')
-    args = parser.parse_args()
+    
 
     VERBOSE = args.verbose  # Turns on print statements
     LOCAL_ONLY = args.local_only
@@ -176,8 +177,7 @@ if __name__ == '__main__':
         ret_code = daemonize()
         write_d_info(ret_code)
 
-    #while True:
-        #sync(local_file, remote_file)
+    while True:
+        sync(local_file, remote_file)
+        time.sleep(1)
 
-    # TODO: delete bottom line when finished testing
-    sync('file-sync', 'pi@98.113.95.132:/home/pi/stevencloudsync.py')
