@@ -6,5 +6,5 @@ By default the program will sync the given file to the remote machine. Every tim
 
 I specifically created this program so that I can edit files on my machine and have them automatically upload to a remote machine for testing. I initially used an sftp plugin for sublime text to accomplish this goal but I struggled to find a solution for other text editors (such as pycharm or intellij). 
 
-
+The program requires that you have your ssh key in the remote machines authorized keys. The program will not work if a password is required. See this link for information on how to generate an ssh key and add it to the list of authorized keys:cd 
 http://www.howtogeek.com/168147/add-public-ssh-key-to-remote-server-in-a-single-command/
