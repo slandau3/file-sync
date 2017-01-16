@@ -9,14 +9,13 @@ import subprocess
 import re
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-v', '--verbose', action='store_true', help='Print whenever a transfer (save) has taken place')
+parser.add_argument('-v', '--verbose', action='store_true', help='Print whenever a transfer (upload) '
+                                                                 'has been initiated/completed')
 parser.add_argument('-d', '--daemonize', action='store_true', help='Instead of running in the local terminal '
                                                                    'make the process into a daemon. This will '
                                                                    'overwrite verbosity')
 parser.add_argument('local_file', help="The local file to watch and transfer")
 parser.add_argument('remote_file', help="The remote file to be updated to the local_file")
-parser.add_argument('--local_only', action='store_true', help='Disregard the modification time of the remote file.' \
-                                                            'This will cause the local to always overwrite the remote.')
 args = parser.parse_args()
 
 LAST_UPLOAD_TIME = 0
@@ -46,6 +45,7 @@ def daemonize():
         if pid == 0:
             os.chdir(LOGDIR)  # change the working directory to where the logfile will be
             os.umask(UMASK)
+
         else:  # if we are not the child, exit
             os._exit(0)
     else:
@@ -164,10 +164,6 @@ def extract_file_location(remote):
 
 
 if __name__ == '__main__':
-    
-
-    VERBOSE = args.verbose  # Turns on print statements
-    LOCAL_ONLY = args.local_only
 
     local_file = args.local_file
     remote_file = args.remote_file
