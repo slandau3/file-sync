@@ -113,7 +113,12 @@ def sync(local_file, remote_file):
     print(remote_file_info)
 
     time_diff = local_mod_time - remote_mod_time
-    if time_diff <= 0:
+
+    if time_diff < 0:  # Update the local file if the remote is newer
+        subprocess.run(['rsync', remoet_file, local_file])
+        return
+
+    if time_diff == 0:
         return
 
     # Need to update the remote
