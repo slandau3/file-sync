@@ -7,6 +7,8 @@ import os
 import time
 import subprocess
 import re
+from __future__ import print_statement
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-v', '--verbose', action='store_true', help='Print whenever a transfer (upload) '
