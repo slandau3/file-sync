@@ -8,3 +8,12 @@ I specifically created this program so that I can edit files on my machine and h
 
 The program requires that you have your ssh key in the remote machines authorized keys. The program will not work if a password is required. See this link for information on how to generate an ssh key and add it to the list of authorized keys:cd 
 http://www.howtogeek.com/168147/add-public-ssh-key-to-remote-server-in-a-single-command/
+
+~Usage
+    
+    python3 file-sync.py [OPTIONS] local_file remote_file
+    
+ ~
+ example:
+ 
+ python3 file-sync.py foo.txt person@192.168.1.1:/home/person/foo.txt
