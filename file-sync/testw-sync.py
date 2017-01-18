@@ -17,7 +17,7 @@ class WatchAndSync(FileSystemEventHandler):
 
 	def sync(self):
 		print("iniating upload")
-		subprocess.run(['rsync', local_file, remote_file])
+		subprocess.run(['rsync', self.local_file, self.remote_file])
 		print("finished upload")
 
 
