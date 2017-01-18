@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
-
-import argparse
 import sys
 import os
 import time
+import argparse
+import resource
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 import subprocess
-import re
-from __future__ import print_statement
 
 
 parser = argparse.ArgumentParser()
@@ -19,8 +19,6 @@ parser.add_argument('-d', '--daemonize', action='store_true', help='Instead of r
 parser.add_argument('local_file', help="The local file to watch and transfer")
 parser.add_argument('remote_file', help="The remote file to be updated to the local_file")
 args = parser.parse_args()
-
-LAST_UPLOAD_TIME = 0
 
 
 def daemonize():
@@ -94,88 +92,80 @@ def write_d_info(ret_code):
     dfile.close()
 
 
-def sync(local_file, remote_file):
-    # Separate file directory from address of remote file
-    address = extract_address(remote_file)
-    file_loc = extract_file_location(remote_file)
+class WatchAndSync(FileSystemEventHandler):
+    def __init__(self, local_file, remote_file):
+        self.local_file = os.path.abspath(local_file)
+        self.remote_file = remote_file
+        self.observer = Observer(timeout=.1)
+        if os.path.isdir(self.local_file):
+            print("is directory")
+            self.observer.schedule(self, os.path.abspath(local_file), recursive=True)
+        else:
+            self.observer.schedule(self, os.path.abspath(os.path.dirname(local_file)))
 
-    # Obtain the local modification time of the file we are watching
-    try:
-        local_mod_time = os.path.getmtime(local_file)
-    except FileNotFoundError:
-        try: # If the file does not exist on our machine, check to see if it exists on the remote
-            subprocess.run(['rsync', remote_file, local_file])
-            local_mod_time = os.path.getmtime(local_file)
-        except FileNotFoundError:
-            raise FileNotFoundError("Neither local file nor remote file exist!")
+    def sync(self):
+        if args.verbose:
+            print("Initiating Upload")
 
-    # If the file has not changed, don't upload
-    global LAST_UPLOAD_TIME
-    if LAST_UPLOAD_TIME == local_mod_time:
-        return
-    else:
-        LAST_UPLOAD_TIME = local_mod_time
+        subprocess.run(['rsync', self.local_file, self.remote_file])
 
+        if args.verbose:
+            print("Upload Complete")
 
-    remote_dir_list = file_loc.split('/')
-    actual_remote_file = remote_dir_list[-1]
-    path_to_remote_file = "/".join(remote_dir_list[:-1])
+    def on_change(self, path):
+        #print('path is: ' + str(path) + '\n')
+        #if path == self.local_file:
+        self.sync()
 
-    remote_file_info = subprocess.run(['ssh', address, 'cd {file_loc}; stat -c %Y {remote_file}; exit'
-                       .format(file_loc=path_to_remote_file, remote_file=actual_remote_file)],
-                       stdout=subprocess.PIPE)
-    remote_file_info = remote_file_info.stdout.decode('UTF-8')
+    def on_create(self, event):
+        #print("in on create")
+        if self.observer.__class__.__name__ == 'InotifyObserver':
+            return
 
-    if remote_file_info == '':
-        remote_mod_time = 0
-    else:
-        #remote_mod_time = extract_time(remote_file_info)
-        remote_mod_time = float(remote_file_info)
+        else:
+            self.on_change(event.src_path)
 
-    print('remote: ' + str(remote_mod_time))
-    print('local: ' + str(local_mod_time))
-    time_diff = local_mod_time - remote_mod_time
+    def on_modified(self, event):
+        #print('event is', event, self.local_file, '\n')
+        #if event.src_path == self.local_file:
+        print(event.is_directory)
+        self.on_change(event.src_path)
 
-    print('time diff is ' + str(time_diff))
+    def on_moved(self, event):
+        #print('in on moved, event is', event)
+        if event.src_path == self.local_file:
+            try:
+                self.observer.stop()
+                self.observer.join()
+            except RuntimeError:
+                print("stopped")
 
+            exit(1)
 
-    #if time_diff < 0 and not args.local_only:  # Update the local file if the remote is newer
-        #subprocess.run(['rsync', remote_file, local_file])
-        #print("updating local")
-        #return
-
-    if time_diff <= 0:
-        return
-
-    # Need to update the remote
-    if args.verbose:
-        print("uploading file")
-
-    subprocess.run(['rsync', local_file, remote_file])
-
-    if args.verbose:
-        print("Finished uploading file")
-
-
-def extract_address(remote):
-    return remote.split(':')[0]
+    def run(self):
+        self.observer.start()
+        if args.verbose:
+            print("started")
+        try:
+            while True:
+                time.sleep(3600)
+        except KeyboardInterrupt:
+            print('stopped')
+            self.observer.stop()
+        self.observer.join()
 
 
-def extract_file_location(remote):
-    return remote.split(':')[1]
-
-
-if __name__ == '__main__':
-
-    local_file = args.local_file
-    remote_file = args.remote_file
-
+def main():
     if args.daemonize:
         print('daemonizing')
         ret_code = daemonize()
         write_d_info(ret_code)
 
-    while True:
-        sync(local_file, remote_file)
-        time.sleep(1)
+    was = WatchAndSync(args.local_file, args.remote_file)
+    try:
+        was.run()
+    except KeyboardInterrupt:
+        exit(0)
 
+if __name__ == '__main__':
+    main()
